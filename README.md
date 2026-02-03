@@ -167,11 +167,13 @@ curl -X POST https://milestone1-api-203280172.us-central1.run.app/predict \
   -H "Content-Type: application/json" \
   -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
 {"prediction":0}
+![Cloud Run Result](screenshots/cloud_run.png)
 Prediction — Google Cloud Function
 curl -X POST https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function \
   -H "Content-Type: application/json" \
   -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
 {"prediction":0}
+![Cloud Function Result](screenshots/cloud_function.png)
 
 
 
