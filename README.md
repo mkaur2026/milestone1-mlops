@@ -34,9 +34,8 @@ This project represents the **Model Serving** stage of the machine learning life
 - **Output:**
   - `prediction` (integer class)
 
----
-
 ## Project Structure
+```
 milestone1/
 │── main.py
 │── train_model.py
@@ -46,29 +45,26 @@ milestone1/
 │── README.md
 │
 └── cloud_function/
-│── main.py
-│── model.pkl
-│── requirements.txt
+    │── main.py
+    │── model.pkl
+    │── requirements.txt
+```
+This structure separates the API service from the serverless function.
 
----
 ## Part 1 — FastAPI Service (Local)
 
 ### Create and activate virtual environment
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-Install dependencies
 pip install -r requirements.txt
-Train the model
 python train_model.py
-Start the API
 uvicorn main:app --reload
-Test locally
 curl http://127.0.0.1:8000/health
-
 curl -X POST http://127.0.0.1:8000/predict \
   -H "Content-Type: application/json" \
   -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
 
 ## Part 2 - Google Cloud Run Deployment (Docker)
 
@@ -79,31 +75,26 @@ https://milestone1-api-203280172.us-central1.run.app
 ```bash
 docker build -t milestone1-api .
 docker run --rm -p 8080:8080 -e PORT=8080 milestone1-api
-
--Push image to Artifact Registry (example)
 docker tag milestone1-api:v3 us-central1-docker.pkg.dev/milestone1-mlops/milestone1-repo/milestone1-api:v3
 docker push us-central1-docker.pkg.dev/milestone1-mlops/milestone1-repo/milestone1-api:v3
-
--Deploy to Cloud Run
 gcloud run deploy milestone1-api \
   --image us-central1-docker.pkg.dev/milestone1-mlops/milestone1-repo/milestone1-api:v3 \
   --region us-central1 \
   --allow-unauthenticated \
   --port 8080 \
   --timeout 300
-
--Test Cloud Run 
 curl https://milestone1-api-203280172.us-central1.run.app/health
-curl -s -X POST https://milestone1-api-203280172.us-central1.run.app/predict \
+curl -X POST https://milestone1-api-203280172.us-central1.run.app/predict \
   -H "Content-Type: application/json" \
-  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}' && echo
-
+  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
 
 ## Part 3 - Serverless Cloud Function
--Cloud Function URL: https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function
--Deploy Cloud Function
-cd cloud_function
+**Cloud Function URL:** https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function
 
+### Deploy and test Cloud Function
+```bash
+cd cloud_function
 gcloud functions deploy milestone1-function \
   --gen2 \
   --runtime python311 \
@@ -112,68 +103,114 @@ gcloud functions deploy milestone1-function \
   --entry-point predict \
   --trigger-http \
   --allow-unauthenticated
--Test Cloud Function
-curl -s -X POST https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function \
+
+curl -X POST https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function \
   -H "Content-Type: application/json" \
-  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}' && echo
+  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
 
 ---
 
-Lifecycle & Deployment Understanding
-FastAPI (local/container):
+## Lifecycle & Deployment Understanding
+
+**FastAPI:**
 A web service that stays running, loads the model once at startup, and handles many requests.
-Cloud Run:
+
+**Cloud Run:**
 Runs the same container, automatically scales, and provides an HTTPS endpoint. Cold starts may happen when scaling from zero.
-Cloud Function:
+
+**Cloud Function:**
 Runs a single function handler. It is more stateless and can cold start more often depending on traffic.
-Model–API interaction:
+
+**Model–API interaction:**
 Client sends JSON → server validates/parses → model artifact loaded from file → model predicts → JSON response returned.
-Comparison: Cloud Run vs Cloud Function
-Statefulness
+
+---
+
+## Comparison: Cloud Run vs Cloud Function
+
+**Statefulness**
 Cloud Run container: more control over app lifecycle
 Cloud Function: event-driven handler, runtime may start/stop more frequently
-Artifact Loading
+
+**Artifact Loading**
 Cloud Run: model loaded at container startup
 Cloud Function: model may reload on cold start
-Latency
+
+**Latency**
 Both can cold start, but Cloud Functions can feel more “spiky” for infrequent traffic.
-Reproducibility
+
+**Reproducibility**
 Cloud Run: dependencies fixed in Docker image
 Cloud Function: reproducible via requirements.txt + runtime version
-Cold Start Behavior Analysis
-Cloud Run
+
+---
+
+## Cold Start Behavior Analysis
+
+### Cloud Run
 Cloud Run may experience a cold start when scaling from zero instances. During a cold start:
-Container starts
-Dependencies load
-model.pkl loads into memory
-This adds latency to the first request, but later requests are faster while warm.
-Cloud Functions
+- Container starts  
+- Dependencies load  
+- `model.pkl` loads into memory  
+
+
+### Cloud Functions
 Cloud Functions are more stateless and can cold start more often. During a cold start:
-Function environment initializes
-Dependencies load
-Model file loads
-Cold start latency is typically more noticeable than Cloud Run.
-Impact on Model Serving
+- Function environment initializes
+- Dependencies load
+- Model file loads
+
+
+### Impact on Model Serving
 Cold starts affect latency, not correctness. Both deployments return accurate predictions, but Cloud Run generally has more stable response times under consistent traffic.
 
 ---
 
-Results
-Health Check — Cloud Run
+## Results
+
+### Health Check — Cloud Run
+```bash
 curl https://milestone1-api-203280172.us-central1.run.app/health
+```
+
+**Response**
+```json
 {"status":"ok"}
-Prediction — Cloud Run
+```
+
+---
+
+## Prediction — Cloud Run
+```bash
 curl -X POST https://milestone1-api-203280172.us-central1.run.app/predict \
   -H "Content-Type: application/json" \
   -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
+**Response**
+```json
 {"prediction":0}
+```
+
 ![Cloud Run Result](screenshots/cloud_run.png)
-Prediction — Google Cloud Function
+
+---
+
+## Prediction — Google Cloud Function
+```bash
 curl -X POST https://us-central1-milestone1-mlops.cloudfunctions.net/milestone1-function \
   -H "Content-Type: application/json" \
   -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
+**Response**
+```json
 {"prediction":0}
+```
+
 ![Cloud Function Result](screenshots/cloud_function.png)
+
+
+ 
 
 
 
